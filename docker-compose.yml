@@ -1,0 +1,68 @@
+version: "3.9"
+services:
+  # ---------- Databases & Storage ----------
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: files
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user"]
+      interval: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  # ---------- Internal micro‑services ----------
+  storing:
+    build: ./storing_service
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:pass@db:5432/files
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minio
+      - MINIO_SECRET_KEY=minio123
+      - MINIO_BUCKET=reports
+    depends_on:
+      - db
+      - minio
+    ports:
+      - "8081:8000"
+
+  analysis:
+    build: ./analysis_service
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:pass@db:5432/files
+      - STORING_SERVICE_URL=http://storing:8000
+    depends_on:
+      storing:
+        condition: service_started
+    ports:
+      - "8082:8000"
+
+  gateway:
+    build: ./gateway
+    environment:
+      - STORING_SERVICE_URL=http://storing:8000
+      - ANALYSIS_SERVICE_URL=http://analysis:8000
+    depends_on:
+      - storing
+      - analysis
+    ports:
+      - "8080:8000"
+
+volumes:
+  db-data:
+  minio-data:
