@@ -1,6 +1,19 @@
-FROM python:3.11-slim
+# Базовый образ
+FROM python:3.9-slim
+
 WORKDIR /app
-COPY requirements.txt .
+
+# Копируем и устанавливаем зависимости именно из папки analysis_service
+COPY analysis_service/requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Копируем общие модули
+COPY shared/ shared/
+
+# Копируем код анализ-сервиса
+COPY analysis_service/ .
+
+EXPOSE 8082
+
+# Запуск FastAPI через Uvicorn
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8082"]

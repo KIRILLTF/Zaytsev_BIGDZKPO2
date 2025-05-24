@@ -1,7 +1,8 @@
 fastapi
 uvicorn[standard]
-sqlmodel
-asyncpg
-aiofiles
-python-multipart
+sqlalchemy>=2.0
+psycopg2-binary>=2.9
+pydantic
 minio
+sqlmodel
+python-multipart
