@@ -7,7 +7,7 @@
 
 | URL | Сервис |
 |-----|--------|
-| http://localhost:8080/docs | API Gateway (Swagger) |
+| http://localhost:8000/docs | API Gateway (Swagger) |
 | http://localhost:8081/docs | File Storing Service |
 | http://localhost:8082/docs | File Analysis Service |
 | http://localhost:9001 | MinIO Console (login *minio* / *minio123*) |
