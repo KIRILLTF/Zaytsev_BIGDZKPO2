@@ -33,7 +33,6 @@ async def get_wordcloud(location: str):
     async with httpx.AsyncClient() as client:
         r = await client.get(f"{ANALYSIS_URL}/wordcloud/{location}")
         r.raise_for_status()
-        # Проксируем байты картинки
         return httpx.Response(
             status_code=r.status_code,
             content=r.content,

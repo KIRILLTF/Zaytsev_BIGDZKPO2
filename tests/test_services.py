@@ -1,8 +1,3 @@
-# tests/test_services.py
-"""
-Набор заглушек и тестов, дающих ≈70 % покрытия всего репозитория.
-Запуск: pytest -q
-"""
 import sys
 import types
 import os
@@ -10,7 +5,6 @@ import io
 import asyncio
 from pathlib import Path
 
-# --------------------- Стаб-обёртки для внешних библиотек ----------------------
 def _stub_fastapi() -> None:
     fastapi = types.ModuleType("fastapi")
 
@@ -203,8 +197,6 @@ for stub in (
 ):
     stub()
 
-# -------------------------------------------------------------------
-# Настраиваем проектный путь и переменные окружения
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root))
 
@@ -217,7 +209,6 @@ os.environ.update(
     }
 )
 
-# Затыкаем shared.models
 shared_models = types.ModuleType("shared.models")
 
 
@@ -238,8 +229,6 @@ shared_models.Base = _Base
 shared_models.Report = _Report
 sys.modules["shared.models"] = shared_models
 
-# -------------------------------------------------------------------
-# Импортируем ваши сервисы
 import importlib
 
 analysis_analyse = importlib.import_module("analysis_service.analyse")
@@ -247,8 +236,6 @@ analysis_main = importlib.import_module("analysis_service.main")
 storing_main = importlib.import_module("storing_service.main")
 gateway_main = importlib.import_module("gateway.main")
 
-# -------------------------------------------------------------------
-# Тесты
 def test_basic_helpers():
     assert analysis_analyse.basic_stats("a\n\nb")[0] == 2
     assert analysis_analyse.is_duplicate("x", ["x"]) == "x"

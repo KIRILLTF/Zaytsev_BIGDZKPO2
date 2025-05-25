@@ -1,5 +1,3 @@
-# storing_service/main.py
-
 import os
 import io
 import sys
@@ -16,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 
 from minio import Minio, S3Error
 
-from shared.models import Base, Report  # ваша ORM-модель
+from shared.models import Base, Report
 
 logger = logging.getLogger("uvicorn.error")
 app = FastAPI(title="Storing Service")
@@ -24,7 +22,6 @@ app = FastAPI(title="Storing Service")
 
 @app.on_event("startup")
 async def startup_event():
-    # --- Ожидание и подключение к PostgreSQL ---
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
         logger.error("DATABASE_URL не задан")
@@ -48,7 +45,6 @@ async def startup_event():
     Base.metadata.create_all(bind=engine)
     app.state.db_session = sessionmaker(bind=engine)
 
-    # --- Ожидание и подключение к MinIO ---
     minio_url = os.getenv("MINIO_URL")
     access = os.getenv("MINIO_ACCESS_KEY")
     secret = os.getenv("MINIO_SECRET_KEY")
@@ -78,15 +74,12 @@ async def startup_event():
 
 @app.post("/upload")
 async def upload_report(file: UploadFile = File(...)):
-    # Проверяем, что это .txt
     if file.content_type != "text/plain":
         raise HTTPException(415, "Поддерживаются только текстовые файлы (.txt)")
 
     data = await file.read()
-    # Правильная генерация ID
     file_id = str(uuid4())
 
-    # Сохраняем в MinIO
     try:
         app.state.minio.put_object(
             "reports",
@@ -99,7 +92,6 @@ async def upload_report(file: UploadFile = File(...)):
         logger.exception("Ошибка при загрузке в MinIO")
         raise HTTPException(500, "Ошибка хранения файла")
 
-    # Сохраняем метаданные в БД
     session = app.state.db_session()
     try:
         report = Report(id=file_id, filename=file.filename)

@@ -6,8 +6,6 @@ from pydantic import BaseModel
 
 app = FastAPI(title="Analysis Service")
 
-# Модели запросов/ответов
-
 class StatsResult(BaseModel):
     paragraphs: int
     words: int
@@ -20,27 +18,18 @@ class CompareRequest(BaseModel):
 class CompareResponse(BaseModel):
     identical: bool
 
-# Базовый URL Storing Service (возьмётся из env)
 STORING_URL = os.getenv("STORING_SERVICE_URL", "http://storing:8081")
 
-# Один общий клиент для всех запросов
 client = httpx.AsyncClient()
 
 @app.get("/stats/{file_id}", response_model=StatsResult)
 async def stats(file_id: str):
-    """
-    Скачивает файл из Storing, считает:
-      - абзацы (непустые блоки, разделённые двойным \n\n)
-      - слова (split по whitespace)
-      - символы (len строки)
-    """
     url = f"{STORING_URL}/download/{file_id}"
     resp = await client.get(url)
     if resp.status_code != 200:
         raise HTTPException(resp.status_code, f"File {file_id} not found")
     text = resp.text
 
-    # Считаем непустые абзацы
     paragraphs = sum(1 for p in text.split("\n\n") if p.strip())
     words      = len(text.split())
     characters = len(text)
@@ -53,13 +42,9 @@ async def stats(file_id: str):
 
 @app.post("/compare", response_model=CompareResponse)
 async def compare(req: CompareRequest):
-    """
-    Принимает два file_id, скачивает оба файла и сравнивает их побайтово.
-    """
     url1 = f"{STORING_URL}/download/{req.file_id1}"
     url2 = f"{STORING_URL}/download/{req.file_id2}"
 
-    # Загрузим оба файла параллельно
     r1, r2 = await client.get(url1), await client.get(url2)
 
     if r1.status_code != 200:
