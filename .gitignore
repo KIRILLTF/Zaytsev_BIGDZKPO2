@@ -1,1 +1,88 @@
+# ── Python ─────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual envs
+venv*/          # venv/, venv37/, etc.
+.venv*/
+env*/
+.env*/
+
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+wheels/
+sdist/
+develop-eggs/
+downloads/
+.Python
+.installed.cfg
+*.egg
+*.manifest
+*.spec
+
+# PyInstaller
+*.spec
+
+# pytest / coverage / type-checking
+.pytest_cache/
+.coverage*
+htmlcov/
+.mypy_cache/
+.cache/
+nosetests.xml
+*.cover
+*.py,cover
+
+# PDM / Poetry / Pipenv locks
+pdm.lock
+poetry.lock
+Pipfile.lock
+__pypackages__/
+
+# ── Logs & misc ────────────────────────────────────────────────────────
+*.log
+*.pid
+*.sqlite3
+*.db
+
+# ── IDE / Editor files ────────────────────────────────────────────────
 .idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# ── OS files ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Docker / Compose ───────────────────────────────────────────────────
+.docker/
+docker-compose.override.yml
+**/__docker_build__/
+
+# Env files (secrets, local config)
+.env
+.env.*
+
+# ── Service data volumes (local) ───────────────────────────────────────
+db-data/
+minio-data/
+
+# ── Node / front-end (if accidentally added) ───────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Jupyter ────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Sphinx / MkDocs docs build ─────────────────────────────────────────
+docs/_build/
+site/
