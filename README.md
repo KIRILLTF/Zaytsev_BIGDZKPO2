@@ -27,5 +27,3 @@ docker compose up --build
 ```bash
 docker compose run --rm analysis pytest --cov=.
 ```
-
-Проект educational ‑– используйте как стартовый шаблон.
