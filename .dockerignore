@@ -1,25 +1,19 @@
-.git
-.idea
-__pycache__
-*.pyc
+# ---- лишние артефакты ---------------------------------
+__pycache__/
+*.py[cod]
 *.pyo
-# кеши pytest и Python
-.pytest_cache/
-__pycache__/
-*.pyc
-# Python venvs
-.venv/
-venv/
-env/
+*.pyd
 
-# Pytest cache
-.pytest_cache/
+# виртуалки и IDE-мусор
+venv*/        .venv*/       env*/        .env*/
+.idea/        .vscode/      .pytest_cache/
 
-# Python byte-code
-__pycache__/
-*.pyc
+# Git / build / тесты
+.git/
+*.egg-info/
+dist/
+build/
+tests/
+**/__pycache__/
+*.py[cod]
 
-# IDE/temp
-*.swp
-.idea/
-.vscode/
