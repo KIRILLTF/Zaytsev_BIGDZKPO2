@@ -13,9 +13,3 @@
 | http://localhost:9001 | MinIO Console (login *minio* / *minio123*) |
 
 > Все сервисы написаны на **FastAPI**, а файлы хранятся в **MinIO**. Базы данных — PostgreSQL.
-
-### Тесты
-
-```bash
-docker compose run --rm analysis pytest --cov=.
-```
