@@ -1,16 +1,20 @@
-# Базовый образ
+# storing_service/Dockerfile
 FROM python:3.9-slim
 
 WORKDIR /app
 
-# Копируем и устанавливаем зависимости именно из папки storing_service
-COPY requirements.txt .
+# 1) копируем и устанавливаем зависимости
+COPY storing_service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем весь код приложения
-COPY . .
+# 2) копируем общий пакет shared из корня проекта
+COPY shared ./shared
 
+# 3) копируем код самого сервиса
+COPY storing_service ./
+
+# выставляем порт
 EXPOSE 8081
 
-# Запуск FastAPI через Uvicorn
+# запускаем приложение из папки /app
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8081"]

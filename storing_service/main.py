@@ -1,61 +1,125 @@
-import os, hashlib, io
+# storing_service/main.py
+
+import os
+import io
+import sys
+import time
+import logging
 from uuid import uuid4
-from fastapi import FastAPI, UploadFile, HTTPException
-from minio import Minio
-from sqlmodel import SQLModel, create_engine, Session, select
-from models import FileMeta
 
-# ─────────────────────────────  конфиг  ──────────────────────────────
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://user:pass@db:5432/files")
-engine = create_engine(DATABASE_URL, echo=False, future=True)
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import StreamingResponse
 
-MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "minio:9000")
-MINIO_ACCESS   = os.getenv("MINIO_ACCESS_KEY", "minio")
-MINIO_SECRET   = os.getenv("MINIO_SECRET_KEY", "minio123")
-BUCKET_NAME    = os.getenv("MINIO_BUCKET", "reports")
+from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.orm import sessionmaker
 
-minio_client = Minio(
-    MINIO_ENDPOINT, access_key=MINIO_ACCESS, secret_key=MINIO_SECRET, secure=False
-)
+from minio import Minio, S3Error
 
-app = FastAPI(title="File Storing Service")
+from shared.models import Base, Report  # ваша ORM-модель
 
-# ─────────────────────────────  старт  ───────────────────────────────
+logger = logging.getLogger("uvicorn.error")
+app = FastAPI(title="Storing Service")
+
+
 @app.on_event("startup")
-def init_db():
-    SQLModel.metadata.create_all(engine)
-    if not minio_client.bucket_exists(BUCKET_NAME):
-        minio_client.make_bucket(BUCKET_NAME)
+async def startup_event():
+    # --- Ожидание и подключение к PostgreSQL ---
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        logger.error("DATABASE_URL не задан")
+        sys.exit(1)
 
-# ─────────────────────────────  API  ─────────────────────────────────
-@app.post("/internal/store", response_model=FileMeta)
-async def store_file(file: UploadFile):
-    content = await file.read()
-    sha = hashlib.sha256(content).hexdigest()
+    engine = None
+    for attempt in range(1, 11):
+        try:
+            engine = create_engine(database_url)
+            conn = engine.connect()
+            conn.close()
+            logger.info(f"PostgreSQL доступен (попытка {attempt})")
+            break
+        except OperationalError as e:
+            logger.warning(f"Не удалось подключиться к БД (попытка {attempt}): {e}")
+            time.sleep(2)
+    else:
+        logger.error("Не удалось установить соединение с БД после 10 попыток")
+        sys.exit(1)
 
-    with Session(engine) as session:
-        if (meta := session.exec(select(FileMeta).where(FileMeta.hash == sha)).first()):
-            return meta
+    Base.metadata.create_all(bind=engine)
+    app.state.db_session = sessionmaker(bind=engine)
 
-        file_id = str(uuid4())
-        object_name = f"{file_id}.txt"
-        minio_client.put_object(
-            BUCKET_NAME, object_name, io.BytesIO(content),
-            length=len(content), content_type="text/plain"
+    # --- Ожидание и подключение к MinIO ---
+    minio_url = os.getenv("MINIO_URL")
+    access = os.getenv("MINIO_ACCESS_KEY")
+    secret = os.getenv("MINIO_SECRET_KEY")
+    if not (minio_url and access and secret):
+        logger.error("Параметры MinIO не заданы")
+        sys.exit(1)
+
+    host = minio_url.replace("http://", "").replace("https://", "")
+    client = None
+    for attempt in range(1, 11):
+        try:
+            client = Minio(host, access_key=access, secret_key=secret, secure=False)
+            bucket = "reports"
+            if not client.bucket_exists(bucket):
+                client.make_bucket(bucket)
+            logger.info(f"MinIO доступен (попытка {attempt})")
+            break
+        except Exception as e:
+            logger.warning(f"Не удалось подключиться к MinIO (попытка {attempt}): {e}")
+            time.sleep(2)
+    else:
+        logger.error("Не удалось установить соединение с MinIO после 10 попыток")
+        sys.exit(1)
+
+    app.state.minio = client
+
+
+@app.post("/upload")
+async def upload_report(file: UploadFile = File(...)):
+    # Проверяем, что это .txt
+    if file.content_type != "text/plain":
+        raise HTTPException(415, "Поддерживаются только текстовые файлы (.txt)")
+
+    data = await file.read()
+    # Правильная генерация ID
+    file_id = str(uuid4())
+
+    # Сохраняем в MinIO
+    try:
+        app.state.minio.put_object(
+            "reports",
+            file_id,
+            io.BytesIO(data),
+            length=len(data),
+            content_type="text/plain"
         )
+    except S3Error:
+        logger.exception("Ошибка при загрузке в MinIO")
+        raise HTTPException(500, "Ошибка хранения файла")
 
-        meta = FileMeta(id=file_id, name=file.filename, hash=sha, location=object_name)
-        session.add(meta)
+    # Сохраняем метаданные в БД
+    session = app.state.db_session()
+    try:
+        report = Report(id=file_id, filename=file.filename)
+        session.add(report)
         session.commit()
-        session.refresh(meta)
-        return meta
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Ошибка при записи в БД")
+        raise HTTPException(500, "Ошибка записи метаданных")
+    finally:
+        session.close()
 
-@app.get("/files/{file_id}")
-def get_file(file_id: str):
-    with Session(engine) as session:
-        meta = session.get(FileMeta, file_id)
-        if not meta:
-            raise HTTPException(status_code=404, detail="File not found")
+    return {"file_id": file_id}
 
-    resp = minio_client.get_object(BUCKET_NAME, meta.location)
-    return {"filename": meta.name, "content": resp.read().decode()}
+
+@app.get("/download/{file_id}")
+async def download_report(file_id: str):
+    try:
+        data = app.state.minio.get_object("reports", file_id)
+        return StreamingResponse(data, media_type="text/plain")
+    except Exception:
+        logger.exception("Ошибка при чтении файла из MinIO")
+        raise HTTPException(404, "Файл не найден")

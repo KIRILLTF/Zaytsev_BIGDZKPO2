@@ -28,8 +28,8 @@ services:
 
   storing:
     build:
-      context: ./storing_service
-      dockerfile: Dockerfile
+      context: .                          # контекст — корень проекта
+      dockerfile: storing_service/Dockerfile
     depends_on:
       - db
       - minio
@@ -46,7 +46,7 @@ services:
   analysis:
     build:
       context: .
-      dockerfile: ./analysis_service/Dockerfile
+      dockerfile: analysis_service/Dockerfile
     depends_on:
       - db
       - storing
